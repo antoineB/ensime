@@ -290,6 +290,20 @@ class Analyzer(val project: Project, val protocol: ProtocolConversions, val conf
                       project ! RPCResultEvent(toWF(SymbolDesignations(f.path, List())), callId)
                     }
                   }
+		  
+		  case Outline(file: File) => {
+                    if (!file.exists()) {
+                      project ! RPCErrorEvent(ErrFileDoesNotExist,
+					      Some(file.getPath()), callId)
+                    } 
+		    else {
+		      scalaCompiler.askStructure(scalaCompiler.sourceFileForPath(file.getAbsolutePath())) match { 
+			case Some(sexp) => project ! RPCResultEvent(sexp, callId)
+			case _ => project ! RPCResultEvent(NilAtom(), callId)
+		      }
+		      
+		    }
+		  }
 
                 }
               }

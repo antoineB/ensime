@@ -1517,6 +1517,15 @@ trait SwankProtocol extends Protocol {
         rpcTarget.rpcShutdownServer(callId)
       }
 
+      case "swank:outline" => { 
+	form match {
+	  case SExpList(head :: StringAtom(file) :: body) => {
+	    rpcTarget.rpcOutlineFile(file, callId)
+	  }
+	  case _ => oops
+	}
+      }
+
       case other => {
         sendRPCError(
           ErrUnrecognizedRPC,

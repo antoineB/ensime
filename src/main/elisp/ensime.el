@@ -90,6 +90,11 @@
   :type 'boolean
   :group 'ensime-ui)
 
+(defcustom ensime-outline-scala-file nil
+  "If non-nil, create imenu table on load and save buffer"
+  :type 'boolean
+  :group 'ensime-ui)
+
 (defcustom ensime-graphical-tooltips nil
   "If non-nil, show graphical bubbles for tooltips."
   :type 'boolean
@@ -381,6 +386,14 @@ Do not show 'Writing..' message."
 
         (add-hook 'ensime-source-buffer-loaded-hook
                   'ensime-sem-high-refresh-hook t)
+
+	(when ensime-outline-scala-file
+	  (add-hook 'ensime-source-buffer-saved-hook
+		    'ensime-outline-file)
+
+	  (add-hook 'ensime-source-buffer-loaded-hook
+		    'ensime-outline-file)
+	  )
 
         (when ensime-tooltip-hints
           (add-hook 'tooltip-functions 'ensime-tooltip-handler)
@@ -2991,6 +3004,41 @@ with the current project's dependencies loaded. Returns a property list."
 (defun ensime-rpc-symbol-designations (file start end requested-types continue)
   (ensime-eval-async `(swank:symbol-designations ,file ,start ,end ,requested-types)
 		     continue))
+
+
+(defun ensime-rpc-outline-file (file-name)
+  (ensime-eval `(swank:outline ,file-name)))
+
+(defvar ensime-outline-var nil)
+
+(defun ensime-outline-current-file ()
+  (interactive)
+  (if (buffer-modified-p) (ensime-write-buffer nil t))
+  (dolist (con (ensime-connections-for-source-file buffer-file-name))
+    (let ((ensime-dispatching-connection con))
+      (setq ensime-outline-var (ensime-rpc-outline-file
+       buffer-file-name
+       ))
+      ))
+  )
+
+(defun ensime-outline-file ()
+  (ensime-outline-current-file)
+  (setq imenu-create-index-function 'ensime-outline-current-file-imenu)
+)
+
+;;function for imenu-create-index-function
+(defun ensime-outline-current-file-imenu () 
+  ensime-outline-var
+)
+
+
+(defun ensime-outline-print-var ()
+  (interactive)
+  (with-current-buffer (get-buffer-create "*outline-file*")
+    (erase-buffer)
+    (print ensime-outline-var (current-buffer))
+    (pop-to-buffer (current-buffer))))
 
 
 ;; Uses UI

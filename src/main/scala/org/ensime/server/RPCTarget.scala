@@ -131,6 +131,11 @@ trait RPCTarget { self: Project =>
     analyzer ! RPCRequestEvent(SymbolDesignationsReq(file, start, end, requestedTypes), callId)
   }
 
+  def rpcOutlineFile(f: String, callId: Int) {
+    val file: File = new File(f)
+    analyzer ! RPCRequestEvent(Outline(file), callId)
+  }
+
   def rpcTypecheckFile(f: String, callId: Int) {
     val file: File = new File(f)
     analyzer ! RPCRequestEvent(ReloadFileReq(file), callId)

@@ -70,6 +70,13 @@ case class SExpList(items: Iterable[SExp]) extends SExp with Iterable[SExp] {
 }
 
 
+case class SExpAssoc(itemA: SExp, itemB: SExp) extends SExp { 
+  override def toString = "(" + itemA + " . " + itemB + ")"
+  override def toReadableString = {
+    "(" + itemA.toReadableString + " . " + itemB.toReadableString + ")"
+  }
+}
+
 object BooleanAtom {
 
   def unapply(z: SExp): Option[Boolean] = z match {

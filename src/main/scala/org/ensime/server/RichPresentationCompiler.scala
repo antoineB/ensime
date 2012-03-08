@@ -29,6 +29,7 @@ package org.ensime.server
 import java.io.File
 import org.ensime.config.ProjectConfig
 import org.ensime.model._
+import org.ensime.util._
 import scala.actors.Actor._
 import scala.actors.Actor
 import scala.collection.mutable
@@ -44,6 +45,110 @@ import scala.tools.refactoring.analysis.GlobalIndexes
 
 trait RichCompilerControl extends CompilerControl with RefactoringControl with CompletionControl {
   self: RichPresentationCompiler =>
+
+  def askStructure(f: SourceFile) = { 
+    val x = new Response[Tree]()
+    super.askParsedEntered(f, false, x)
+    val structure = x.get
+ 
+   def formatTree(tree: Tree): Option[SExp] = tree match {
+     case ClassDef(mods, name, tparams, impl) => {
+       val children = tree.children.head.children.foldLeft[Option[SExp]](None)((str, arg) => formatTree(arg) match { 
+	 case Some(sexp) => str match { 
+	   case Some(SExpList(list)) => Some(SExpList(list.toList :+ sexp))
+	   case _ => Some(SExpList(List(sexp)))
+	 }
+	 case _ => str
+       })
+
+       Some(
+	 SExpAssoc(
+	   StringAtom("class %s%s".format(name, stringListTParams(tparams))),
+	   children match { 
+	     case Some(sexp) => sexp
+	     case _ => IntAtom(tree.pos.point)
+	   }
+	 ))
+     }
+      
+     case DefDef (mods, name, tparams, vparamss, tpt, rhs) => Some(
+       SExpAssoc(
+	 "def %s%s%s: %s".format(name, stringListTParams(tparams), vparamss.foldLeft("")((str, arg) => str + stringListVParam(arg)), tpt.symbol.name),
+	 tree.pos.point
+       ))
+     
+     
+     //the object symbol
+     case ModuleDef (mods, name, impl) => {
+       val s = tree.children.head.children.foldLeft[Option[SExp]](None)((str, arg) => formatTree(arg) match { 
+	 case Some(sexp) => str match { 
+	   case Some(SExpList(list)) => Some(SExpList(list.toList :+ sexp))
+	   case _ => Some(SExpList(List(sexp)))
+	 }
+	 case _ => str
+       })
+
+       Some(
+	 SExpAssoc(
+	   StringAtom("object %s".format(name)),
+	   s match { 
+	     case Some(sexp) => sexp
+	     case _ => IntAtom(tree.pos.point)
+	   }
+	 ))
+     }
+     
+     case PackageDef (pid: RefTree, stats: List[Tree]) => {
+       println("**package " + pid.toString)
+       None
+     }
+     
+     case _ => {
+       println("**unkown")
+       None
+     }
+   }
+   
+   
+   def stringListVParam(vparams: List[ValDef]): String = {
+     if (vparams.isEmpty) 
+       "()"
+     else
+       "(" + vparams.tail.foldLeft(stringValDef(vparams.head))((str, arg) => str + ", " + stringValDef(arg)) + ")"
+   }
+
+    def stringListTParams(tparams: List[TypeDef]): String = {
+      if (tparams.isEmpty)
+	""
+      else
+	"[" + tparams.tail.foldLeft(stringTypeDef(tparams.head))((str, arg) => str + ", " + stringTypeDef(arg)) + "]"
+    }
+
+    def stringValDef(tree: Tree): String = tree match {
+      case ValDef(mods, name, tpt, rhs) => tpt.symbol.name.toString
+      case _ => ""
+    }
+   
+
+    def stringTypeDef(tree: Tree): String = tree match {
+      case TypeDef(mods, name, tparams, rhs) => name.toString + stringListTParams(tparams)
+      case _ => ""
+    }
+
+    if (structure.isLeft) {
+      val topClass = structure.left.get.children.filter(arg => arg.symbol.isClass || arg.symbol.isAbstractClass || arg.symbol.isImplClass)
+
+      topClass.foldLeft[Option[SExp]](None)((str, arg) => formatTree(arg) match { 
+	 case Some(sexp) => str match { 
+	   case Some(SExpList(list)) => Some(SExpList(list.toList :+ sexp))
+	   case _ => Some(SExpList(List(sexp)))
+	 }
+	 case _ => str
+       })
+    }
+    else
+      None
+  }
 
   def askOption[A](op: => A): Option[A] =
   try {
