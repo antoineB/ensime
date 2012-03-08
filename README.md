@@ -1,3 +1,6 @@
+use custom variable ensime-outline-scala-file
+
+
 # ENSIME
 the ENhanced Scala Interaction Mode for Emacs
 
