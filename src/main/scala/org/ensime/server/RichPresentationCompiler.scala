@@ -52,6 +52,7 @@ trait RichCompilerControl extends CompilerControl with RefactoringControl with C
     val structure = x.get
  
    def formatTree(tree: Tree): Option[SExp] = tree match {
+
      case ClassDef(mods, name, tparams, impl) => {
        val children = tree.children.head.children.foldLeft[Option[SExp]](None)((str, arg) => formatTree(arg) match { 
 	 case Some(sexp) => str match { 
@@ -60,10 +61,21 @@ trait RichCompilerControl extends CompilerControl with RefactoringControl with C
 	 }
 	 case _ => str
        })
+       
+       val str = 
+	 { if (mods.isPrivate) "private " else if (mods.isProtected) "protected " else "" } +
+       	 { if (mods.isSealed) "sealed " else "" } + 
+	 { if (mods.hasAbstractFlag && !mods.hasTraitFlag) "absctract " else "" } + 
+	 { if (mods.isFinal) "final " else "" } +
+	 { if (mods.isCase) "case " else "" } +
+	 { if (mods.isOverride) "override " else "" } +
+	 { if (mods.isImplicit) "implicit " else ""} +
+	 { if (mods.hasTraitFlag) "trait " else "class "} +
+	 name + stringListTParams(tparams)
 
        Some(
 	 SExpAssoc(
-	   StringAtom("class %s%s".format(name, stringListTParams(tparams))),
+	   StringAtom(str),
 	   children match { 
 	     case Some(sexp) => sexp
 	     case _ => IntAtom(tree.pos.point)
@@ -73,7 +85,11 @@ trait RichCompilerControl extends CompilerControl with RefactoringControl with C
       
      case DefDef (mods, name, tparams, vparamss, tpt, rhs) => Some(
        SExpAssoc(
-	 "def %s%s%s: %s".format(name, stringListTParams(tparams), vparamss.foldLeft("")((str, arg) => str + stringListVParam(arg)), tpt.symbol.name),
+	 "%sdef %s%s%s: %s".format({ if (mods.isPrivate) "private " else if (mods.isProtected) "protected " else "" } +
+				   { if (mods.isFinal) "final " else "" } +
+				   { if (mods.isOverride) "override " else ""} +
+				   { if (mods.isImplicit) "implicit " else ""}, 
+				   name, stringListTParams(tparams), vparamss.foldLeft("")((str, arg) => str + stringListVParam(arg)), tpt.symbol.name),
 	 tree.pos.point
        ))
      
@@ -90,7 +106,8 @@ trait RichCompilerControl extends CompilerControl with RefactoringControl with C
 
        Some(
 	 SExpAssoc(
-	   StringAtom("object %s".format(name)),
+	   StringAtom("%sobject %s".format({ if (mods.isPrivate) "private " else if (mods.isProtected) "protected " else "" } + 
+					   { if (mods.isCase) "case " else "" }, name)),
 	   s match { 
 	     case Some(sexp) => sexp
 	     case _ => IntAtom(tree.pos.point)
@@ -100,6 +117,16 @@ trait RichCompilerControl extends CompilerControl with RefactoringControl with C
      
      case PackageDef (pid: RefTree, stats: List[Tree]) => {
        println("**package " + pid.toString)
+       None
+     }
+
+     case ValDef (mods, name, tpt, rhs) => { 
+       println("**val " + name.toString)
+       None
+     }
+
+     case TypeDef (mods, name, tparams, rhs) => { 
+       println("**type " + name.toString)
        None
      }
      
